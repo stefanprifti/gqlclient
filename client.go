@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sync"
 )
 
@@ -31,9 +32,9 @@ type TokenProvider interface {
 
 // Request is a GraphQL request.
 type Request struct {
-	Operation string                 `json:"-"`
-	Query     string                 `json:"query"`
-	Variables map[string]interface{} `json:"variables"`
+	Operation string      `json:"-"`
+	Query     string      `json:"query"`
+	Variables interface{} `json:"variables"`
 }
 
 // Response is a GraphQL response.
@@ -62,7 +63,7 @@ func New(opts Options) *Client {
 }
 
 // Query executes a GraphQL query.
-func (c *Client) Query(ctx context.Context, q string, v map[string]interface{}, resp interface{}) error {
+func (c *Client) Query(ctx context.Context, q string, v interface{}, resp interface{}) error {
 	req := &Request{
 		Operation: "query",
 		Query:     q,
@@ -72,7 +73,7 @@ func (c *Client) Query(ctx context.Context, q string, v map[string]interface{}, 
 }
 
 // Mutation executes a GraphQL mutation.
-func (c *Client) Mutation(ctx context.Context, q string, v map[string]interface{}, resp interface{}) error {
+func (c *Client) Mutation(ctx context.Context, q string, v interface{}, resp interface{}) error {
 	req := &Request{
 		Operation: "mutation",
 		Query:     q,
@@ -83,6 +84,11 @@ func (c *Client) Mutation(ctx context.Context, q string, v map[string]interface{
 
 // do executes a GraphQL request.
 func (c *Client) do(ctx context.Context, req *Request, data interface{}) error {
+	err := validateOperationVariables(req.Variables)
+	if err != nil {
+		return fmt.Errorf("failed to validate operation variables: %w", err)
+	}
+
 	jsonReq, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
@@ -155,6 +161,22 @@ func (c *Client) refreshToken() error {
 		if err != nil {
 			return fmt.Errorf("failed to get token: %w", err)
 		}
+	}
+
+	return nil
+}
+
+func validateOperationVariables(v interface{}) error {
+	reflectType := reflect.TypeOf(v)
+	if reflectType.Kind() == reflect.Map {
+		if reflectType.Key().Kind() != reflect.String {
+			return fmt.Errorf("expected map key to be string, got %s", reflectType.Key().Kind())
+		}
+		if reflectType.Elem().Kind() != reflect.Interface {
+			return fmt.Errorf("expected map value to be interface{}, got %s", reflectType.Elem().Kind())
+		}
+	} else if reflectType.Kind() != reflect.Struct {
+		return fmt.Errorf("expected variables to be map[string]interface{} or struct, got %s", reflectType.Kind())
 	}
 
 	return nil
