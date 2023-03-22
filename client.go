@@ -172,6 +172,10 @@ func validateOperationVariables(v interface{}) error {
 	}
 
 	reflectType := reflect.TypeOf(v)
+	if reflectType.Kind() == reflect.Ptr {
+		reflectType = reflectType.Elem()
+	}
+
 	if reflectType.Kind() == reflect.Map {
 		if reflectType.Key().Kind() != reflect.String {
 			return fmt.Errorf("expected map key to be string, got %s", reflectType.Key().Kind())
