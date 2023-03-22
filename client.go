@@ -34,7 +34,7 @@ type TokenProvider interface {
 type Request struct {
 	Operation string      `json:"-"`
 	Query     string      `json:"query"`
-	Variables interface{} `json:"variables"`
+	Variables interface{} `json:"variables,omitempty"`
 }
 
 // Response is a GraphQL response.
@@ -167,6 +167,10 @@ func (c *Client) refreshToken() error {
 }
 
 func validateOperationVariables(v interface{}) error {
+	if v == nil {
+		return nil
+	}
+
 	reflectType := reflect.TypeOf(v)
 	if reflectType.Kind() == reflect.Map {
 		if reflectType.Key().Kind() != reflect.String {
